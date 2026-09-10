@@ -1,0 +1,6 @@
+@SignageBackend_HostAddress = http://localhost:5169
+
+GET {{SignageBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
