@@ -11,3 +11,9 @@ public class PlaylistUpdateRequest
     public string ScreenCode { get; set; } = string.Empty;
     public List<SlideDto> Slides { get; set; } = new();
 }
+
+
+public class FileUploadDto
+{
+    public IFormFile File { get; set; } = null!;
+}
