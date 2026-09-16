@@ -59,42 +59,66 @@ function startPlayer() {
 startPlayer();
 
 // --- CONFIGURACIÓN DE PANTALLA ---
-// Puedes asignarle un código a esta pantalla (ej. "PANTALLA-SALA-01")
+// --- CONFIGURACIÓN DE PANTALLA ---
 const SCREEN_CODE = localStorage.getItem("screen_code") || "PANTALLA-SALA-01";
 localStorage.setItem("screen_code", SCREEN_CODE);
 
-// Conexión en tiempo real con SignalR (.NET Hub)
-// Cambia la URL cuando tu hermano tenga su Hub levantado (ej. http://localhost:5000/signageHub)
+const API_BASE_URL = "http://192.168.1.10:5000";
+
+// --- FUNCIÓN PARA OBTENER PLAYLIST DE LA BD (.NET) ---
+async function fetchPlaylistFromBackend() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/Playlist/${SCREEN_CODE}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.length > 0) {
+        console.log("Playlist cargada desde base de datos:", data);
+        playlist = data;
+        localStorage.setItem("saved_playlist", JSON.stringify(data));
+        currentIndex = 0;
+        startPlayer();
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn("No se pudo conectar al backend, usando caché local:", err);
+  }
+
+  // Si no hay respuesta o falla la red, recurre a lo que tenga en disco
+  const cached = localStorage.getItem("saved_playlist");
+  if (cached) {
+    playlist = JSON.parse(cached);
+    startPlayer();
+  }
+}
+
+// --- CONEXIÓN SIGNALR ---
 const connection = new signalR.HubConnectionBuilder()
-  .withUrl("http://192.168.1.9:5000/signageHub") 
+  .withUrl(`${API_BASE_URL}/signageHub`)
   .withAutomaticReconnect([0, 2000, 5000, 10000])
   .build();
 
-// Evento que emitirá .NET cuando el dueño actualice su menú
 connection.on("UpdatePlaylist", (newPlaylist) => {
-  console.log("Nueva lista recibida desde el backend:", newPlaylist);
+  console.log("Nueva lista recibida en tiempo real:", newPlaylist);
   playlist = newPlaylist;
-  localStorage.setItem('saved_playlist', JSON.stringify(newPlaylist));
+  localStorage.setItem("saved_playlist", JSON.stringify(newPlaylist));
   currentIndex = 0;
   startPlayer();
 });
 
-// Iniciar conexión y unirse al grupo de la pantalla
 async function connectSignalR() {
   try {
     await connection.start();
-    console.log("Conectado a SignalR");
     statusText.textContent = `Online (${SCREEN_CODE})`;
     statusText.className = "online";
-
-    // Informar al backend a qué pantalla representamos
     await connection.invoke("JoinScreen", SCREEN_CODE);
   } catch (err) {
-    console.error("Error conectando a SignalR:", err);
     statusText.textContent = "Offline (Local)";
     statusText.className = "offline";
     setTimeout(connectSignalR, 5000);
   }
 }
 
+// Arrancar el visor: primero consulta la BD y luego abre el WebSocket
+fetchPlaylistFromBackend();
 connectSignalR();
