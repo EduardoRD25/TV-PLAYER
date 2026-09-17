@@ -1,12 +1,14 @@
-# Archivos de compilación de .NET
-bin/
-obj/
+# Compilación .NET
+**/bin/
+**/obj/
 
-# Base de datos SQLite local
+# Base de datos SQLite
 *.db
 *.db-shm
 *.db-wal
 
-# Configuraciones de entorno y Live Server
+# Archivos subidos localmente
+**/uploads/
+
+# Entorno VS Code
 .vscode/
-*.user
