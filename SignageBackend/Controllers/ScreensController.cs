@@ -1,6 +1,6 @@
-//Tendrá los endpoints para registrar la pantalla no emparejada, 
-//emparejarla desde el panel de administración y listar las pantallas existentes
-
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +23,6 @@ public class ScreensController : ControllerBase
         _hubContext = hubContext;
     }
 
-    // 1. La TV arranca y registra su código generado si no existe en BD
     [HttpPost("register")]
     public async Task<IActionResult> RegisterScreen([FromBody] RegisterScreenRequest request)
     {
@@ -37,7 +36,8 @@ public class ScreensController : ControllerBase
             {
                 Code = request.Code.ToUpper().Trim(),
                 Name = "Pantalla Pendiente",
-                IsPaired = false
+                IsPaired = false,
+                LastPingAt = DateTime.UtcNow
             };
             _db.Screens.Add(screen);
             await _db.SaveChangesAsync();
@@ -46,7 +46,6 @@ public class ScreensController : ControllerBase
         return Ok(new { screen.Code, screen.IsPaired });
     }
 
-    // 2. El dueño ingresa el código en su celular/React para reclamar la TV
     [HttpPost("pair")]
     public async Task<IActionResult> PairScreen([FromBody] PairScreenRequest request)
     {
@@ -59,10 +58,10 @@ public class ScreensController : ControllerBase
 
         screen.Name = string.IsNullOrWhiteSpace(request.Name) ? "Pantalla Principal" : request.Name;
         screen.IsPaired = true;
+        screen.LastPingAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
 
-        // Notificar en tiempo real a la TV Box que fue vinculada exitosamente
         await _hubContext.Clients.Group(screen.Code).SendAsync("ScreenPaired", new
         {
             screenCode = screen.Code,
@@ -72,10 +71,12 @@ public class ScreensController : ControllerBase
         return Ok(new { message = $"Pantalla {screen.Code} vinculada exitosamente." });
     }
 
-    // 3. Obtener listado de pantallas (para el panel en React de tu hermano)
+    // Endpoint clave para el panel administrativo
     [HttpGet]
     public async Task<IActionResult> GetAllScreens()
     {
+        var threshold = DateTime.UtcNow.AddSeconds(-60);
+
         var screens = await _db.Screens
             .Select(s => new
             {
@@ -83,7 +84,10 @@ public class ScreensController : ControllerBase
                 s.Code,
                 s.Name,
                 s.IsPaired,
-                ItemCount = s.Items.Count
+                s.LastPingAt,
+                // Si el ping fue hace menos de 60 segundos, está en línea
+                IsOnline = s.LastPingAt >= threshold,
+                SlideCount = s.Items.Count
             })
             .ToListAsync();
 

@@ -8,6 +8,9 @@ public class Screen
     public bool IsPaired { get; set; } = false;      // ¿Ya fue reclamada por un cliente?
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Campos para monitoreo en tiempo real
+    public DateTime LastPingAt { get; set; } = DateTime.UtcNow;
+
     // Relación 1 a muchos con los elementos de su playlist
     public List<PlaylistItem> Items { get; set; } = new();
 }

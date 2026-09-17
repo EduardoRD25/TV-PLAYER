@@ -99,6 +99,9 @@ async function connectSignalR() {
 
     await connection.invoke("JoinScreen", SCREEN_CODE);
 
+    // Iniciar el envío periódico de latidos
+    startHeartbeat();
+
     // Registrar en BD si está pendiente
     await fetch(`${API_BASE_URL}/api/Screens/register`, {
       method: "POST",
@@ -136,6 +139,23 @@ async function fetchPlaylistFromBackend() {
     currentIndex = 0;
     startPlayer();
   }
+}
+
+// Variable para el temporizador de heartbeat
+let heartbeatTimer = null;
+
+function startHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+
+  heartbeatTimer = setInterval(async () => {
+    if (connection && connection.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connection.invoke("SendHeartbeat", SCREEN_CODE);
+      } catch (err) {
+        console.warn("Fallo al enviar heartbeat:", err);
+      }
+    }
+  }, 25000); // Cada 25 segundos
 }
 
 // Inicialización
