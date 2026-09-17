@@ -1,102 +1,87 @@
-// Registro de Service Worker para funcionamiento Offline
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js')
-    .then(() => console.log('Service Worker activo'))
-    .catch(err => console.error('Error en Service Worker:', err));
-}
-
-// Ocultar cursor en pantalla
-let mouseTimer;
-document.addEventListener('mousemove', () => {
-  document.body.classList.remove('hide-cursor');
-  clearTimeout(mouseTimer);
-  mouseTimer = setTimeout(() => document.body.classList.add('hide-cursor'), 3000);
-});
-
-// Playlist inicial por defecto o recuperada de caché local
-let playlist = JSON.parse(localStorage.getItem('saved_playlist')) || [
-  { url: 'https://picsum.photos/id/1060/1920/1080', duration: 6000 },
-  { url: 'https://picsum.photos/id/292/1920/1080', duration: 6000 },
-  { url: 'https://picsum.photos/id/429/1920/1080', duration: 6000 }
-];
-
-let currentIndex = 0;
-let loopTimer = null;
-const container = document.getElementById('player');
-const statusText = document.getElementById('status-text');
-
-function renderSlides() {
-  container.innerHTML = '';
-  playlist.forEach((item, index) => {
-    const img = document.createElement('img');
-    img.src = item.url;
-    img.className = `slide ${index === 0 ? 'active' : ''}`;
-    container.appendChild(img);
-  });
-}
-
-function nextSlide() {
-  const slides = document.querySelectorAll('.slide');
-  if (slides.length === 0) return;
-
-  slides[currentIndex].classList.remove('active');
-  currentIndex = (currentIndex + 1) % slides.length;
-  slides[currentIndex].classList.add('active');
-
-  const currentDuration = playlist[currentIndex].duration || 5000;
-  loopTimer = setTimeout(nextSlide, currentDuration);
-}
-
-function startPlayer() {
-  clearTimeout(loopTimer);
-  renderSlides();
-  if (playlist.length > 1) {
-    loopTimer = setTimeout(nextSlide, playlist[0].duration || 5000);
-  }
-}
-
-// Inicializar reproductor
-startPlayer();
-
-// --- CONFIGURACIÓN DE PANTALLA ---
-// --- CONFIGURACIÓN DE PANTALLA ---
-const SCREEN_CODE = localStorage.getItem("screen_code") || "PANTALLA-SALA-01";
-localStorage.setItem("screen_code", SCREEN_CODE);
-
 const API_BASE_URL = "http://192.168.1.10:5000";
 
-// --- FUNCIÓN PARA OBTENER PLAYLIST DE LA BD (.NET) ---
-async function fetchPlaylistFromBackend() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/Playlist/${SCREEN_CODE}`);
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.length > 0) {
-        console.log("Playlist cargada desde base de datos:", data);
-        playlist = data;
-        localStorage.setItem("saved_playlist", JSON.stringify(data));
-        currentIndex = 0;
-        startPlayer();
-        return;
-      }
-    }
-  } catch (err) {
-    console.warn("No se pudo conectar al backend, usando caché local:", err);
-  }
+// Elementos del DOM
+const pairingScreen = document.getElementById("pairing-screen");
+const pairingCodeDisplay = document.getElementById("pairing-code-display");
+const statusText = document.getElementById("status-text");
+const slideA = document.getElementById("slide-a");
+const slideB = document.getElementById("slide-b");
 
-  // Si no hay respuesta o falla la red, recurre a lo que tenga en disco
-  const cached = localStorage.getItem("saved_playlist");
-  if (cached) {
-    playlist = JSON.parse(cached);
-    startPlayer();
+// Estado del reproductor
+let playlist = [];
+let currentIndex = 0;
+let slideTimer = null;
+let activeSlideElement = slideA;
+
+// 1. Obtener o generar código único de pantalla
+let SCREEN_CODE = localStorage.getItem("screen_code");
+let IS_PAIRED = localStorage.getItem("is_paired") === "true";
+
+if (!SCREEN_CODE) {
+  const randomDigits = Math.floor(1000 + Math.random() * 9000);
+  SCREEN_CODE = `TV-${randomDigits}`;
+  localStorage.setItem("screen_code", SCREEN_CODE);
+}
+
+// 2. Controlar la vista de vinculación
+function checkPairingState() {
+  if (!IS_PAIRED) {
+    pairingCodeDisplay.textContent = SCREEN_CODE;
+    pairingScreen.classList.remove("hidden");
+  } else {
+    pairingScreen.classList.add("hidden");
   }
 }
 
-// --- CONEXIÓN SIGNALR ---
+// 3. Lógica del Carrusel con Pre-carga Suave
+function startPlayer() {
+  if (slideTimer) clearTimeout(slideTimer);
+  if (!playlist || playlist.length === 0) return;
+
+  const currentItem = playlist[currentIndex];
+  activeSlideElement.src = currentItem.url;
+  activeSlideElement.classList.add("active");
+
+  scheduleNextSlide(currentItem.duration || 5000);
+}
+
+function scheduleNextSlide(duration) {
+  slideTimer = setTimeout(() => {
+    currentIndex = (currentIndex + 1) % playlist.length;
+    const nextItem = playlist[currentIndex];
+
+    const incomingElement = activeSlideElement === slideA ? slideB : slideA;
+    const outgoingElement = activeSlideElement;
+
+    const imgLoader = new Image();
+    imgLoader.onload = () => {
+      incomingElement.src = nextItem.url;
+      incomingElement.classList.add("active");
+      outgoingElement.classList.remove("active");
+      activeSlideElement = incomingElement;
+      scheduleNextSlide(nextItem.duration || 5000);
+    };
+    imgLoader.onerror = () => {
+      console.warn("Error cargando imagen:", nextItem.url);
+      scheduleNextSlide(2000);
+    };
+    imgLoader.src = nextItem.url;
+  }, duration);
+}
+
+// 4. Conexión SignalR (.NET)
 const connection = new signalR.HubConnectionBuilder()
   .withUrl(`${API_BASE_URL}/signageHub`)
   .withAutomaticReconnect([0, 2000, 5000, 10000])
   .build();
+
+connection.on("ScreenPaired", (data) => {
+  console.log("Pantalla vinculada exitosamente:", data);
+  IS_PAIRED = true;
+  localStorage.setItem("is_paired", "true");
+  pairingScreen.classList.add("hidden");
+  fetchPlaylistFromBackend();
+});
 
 connection.on("UpdatePlaylist", (newPlaylist) => {
   console.log("Nueva lista recibida en tiempo real:", newPlaylist);
@@ -111,7 +96,15 @@ async function connectSignalR() {
     await connection.start();
     statusText.textContent = `Online (${SCREEN_CODE})`;
     statusText.className = "online";
+
     await connection.invoke("JoinScreen", SCREEN_CODE);
+
+    // Registrar en BD si está pendiente
+    await fetch(`${API_BASE_URL}/api/Screens/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: SCREEN_CODE })
+    });
   } catch (err) {
     statusText.textContent = "Offline (Local)";
     statusText.className = "offline";
@@ -119,6 +112,35 @@ async function connectSignalR() {
   }
 }
 
-// Arrancar el visor: primero consulta la BD y luego abre el WebSocket
-fetchPlaylistFromBackend();
+// 5. Cargar lista guardada en SQLite
+async function fetchPlaylistFromBackend() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/Playlist/${SCREEN_CODE}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.length > 0) {
+        playlist = data;
+        localStorage.setItem("saved_playlist", JSON.stringify(data));
+        currentIndex = 0;
+        startPlayer();
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn("Sin conexión con el backend, intentando caché local.");
+  }
+
+  const cached = localStorage.getItem("saved_playlist");
+  if (cached) {
+    playlist = JSON.parse(cached);
+    currentIndex = 0;
+    startPlayer();
+  }
+}
+
+// Inicialización
+checkPairingState();
 connectSignalR();
+if (IS_PAIRED) {
+  fetchPlaylistFromBackend();
+}

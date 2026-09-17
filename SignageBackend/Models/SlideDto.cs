@@ -17,3 +17,15 @@ public class FileUploadDto
 {
     public IFormFile File { get; set; } = null!;
 }
+
+//CLASES PARA EL EMPAREJAMIENTO
+public class RegisterScreenRequest
+{
+    public string Code { get; set; } = string.Empty;
+}
+
+public class PairScreenRequest
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+}

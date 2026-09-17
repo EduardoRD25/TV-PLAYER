@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SignageBackend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1e74ae2e958b422f3278ced9e8c3646412cb2760")]
 [assembly: System.Reflection.AssemblyProductAttribute("SignageBackend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SignageBackend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
