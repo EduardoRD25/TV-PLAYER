@@ -33,4 +33,12 @@ public class SignageHub : Hub
             await _db.SaveChangesAsync();
         }
     }
+
+    public async Task SendRemoteCommand(string screenCode, string action)
+    {
+        if (string.IsNullOrWhiteSpace(screenCode)) return;
+
+        // Enviar la orden específica al grupo de la pantalla
+        await Clients.Group(screenCode).SendAsync("ReceiveCommand", action);
+    }
 }

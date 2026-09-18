@@ -46,6 +46,24 @@ public class ScreensController : ControllerBase
         return Ok(new { screen.Code, screen.IsPaired });
     }
 
+    [HttpDelete("{code}")]
+    public async Task<IActionResult> DeleteScreen(string code)
+    {
+        var screen = await _db.Screens
+            .Include(s => s.Items)
+            .FirstOrDefaultAsync(s => s.Code == code);
+
+        if (screen == null)
+            return NotFound(new { message = "Pantalla no encontrada." });
+
+        // Eliminar diapositivas asociadas y la pantalla
+        _db.PlaylistItems.RemoveRange(screen.Items);
+        _db.Screens.Remove(screen);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = $"Pantalla {code} eliminada correctamente." });
+    }
+
     [HttpPost("pair")]
     public async Task<IActionResult> PairScreen([FromBody] PairScreenRequest request)
     {

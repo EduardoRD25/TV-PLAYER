@@ -115,6 +115,19 @@ connection.on("UpdatePlaylist", (newPlaylist) => {
   startPlayer();
 });
 
+connection.on("ReceiveCommand", (action) => {
+  console.log("Comando remoto recibido:", action);
+  if (action === "reload") {
+    window.location.reload();
+  } else if (action === "clear") {
+    localStorage.removeItem("saved_playlist");
+    playlist = [];
+    clearCurrentTimer();
+    activeSlideElement.src = "";
+    activeSlideElement.classList.remove("active");
+  }
+});
+
 // Variable para el temporizador de heartbeat
 let heartbeatTimer = null;
 

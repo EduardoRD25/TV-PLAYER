@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "./api";
-import { Tv, Plus, Upload, Trash2, CheckCircle2 } from "lucide-react";
 import "./App.css";
+import { Tv, Plus, Upload, Trash2, CheckCircle2, ChevronUp, X } from "lucide-react";
 
 function App() {
   const [screens, setScreens] = useState([]);
@@ -101,6 +101,22 @@ function App() {
     }
   };
 
+  // Eliminar pantalla
+  const handleDeleteScreen = async (e, screenCode) => {
+    e.stopPropagation(); // Evitar seleccionar la pantalla al hacer clic en borrar
+    if (!window.confirm(`¿Estás seguro de eliminar la pantalla ${screenCode}?`)) return;
+
+    try {
+      await api.deleteScreen(screenCode);
+      if (selectedScreen?.code === screenCode) {
+        setSelectedScreen(null);
+      }
+      loadScreens();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   return (
     <div className="dashboard-container">
       <header>
@@ -135,13 +151,24 @@ function App() {
                   key={code}
                   className={`screen-card ${selectedScreen?.code === code ? "selected" : ""}`}
                   onClick={() => handleSelectScreen({ code, name, isOnline, slideCount })}
-                  style={{ cursor: "pointer" }}
+                  style={{ cursor: "pointer", position: "relative" }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
                     <span className={`badge ${isOnline ? "online" : "offline"}`}>
                       {isOnline ? "● En Línea" : "○ Desconectada"}
                     </span>
-                    <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{code}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>{code}</span>
+                      <button
+                        onClick={(e) => handleDeleteScreen(e, code)}
+                        title="Eliminar pantalla"
+                        style={{ background: "transparent", color: "#64748b", padding: "2px", cursor: "pointer" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                   <h3 style={{ fontSize: "1.1rem", marginBottom: "6px" }}>{name}</h3>
                   <p style={{ fontSize: "0.85rem", color: "#64748b" }}>
@@ -159,7 +186,17 @@ function App() {
         <section className="editor-section">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <div>
-              <h2>Editando: {selectedScreen.name} ({selectedScreen.code})</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <h2>Editando: {selectedScreen.name} ({selectedScreen.code})</h2>
+                <button
+                  onClick={() => setSelectedScreen(null)}
+                  title="Ocultar panel de edición"
+                  className="btn-secondary"
+                  style={{ padding: "4px 8px", display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "0.8rem" }}
+                >
+                  <ChevronUp size={16} /> Ocultar
+                </button>
+              </div>
               <span style={{ color: "#94a3b8", fontSize: "0.9rem" }}>Organiza las fotos que se mostrarán en este televisor</span>
             </div>
             <div style={{ display: "flex", gap: "10px" }}>

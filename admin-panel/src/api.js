@@ -51,5 +51,21 @@ export const api = {
     });
     if (!res.ok) throw new Error("Error al publicar cambios");
     return await res.json();
+  },
+
+  // Eliminar una pantalla de la BD
+  deleteScreen: async (code) => {
+    const res = await fetch(`${BASE_URL}/Screens/${code}`, {
+      method: "DELETE"
+    });
+    if (!res.ok) throw new Error("Error al eliminar pantalla");
+    return await res.json();
+  },
+
+  // Enviar comando remoto (recargar visor)
+  sendCommand: async (screenCode, action) => {
+    // Reutilizamos el endpoint o invocamos vía fetch/SignalR
+    // En este caso lo conectamos vía Hub o endpoint ligero
   }
+  
 };
