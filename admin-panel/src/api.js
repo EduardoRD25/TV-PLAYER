@@ -64,8 +64,12 @@ export const api = {
 
   // Enviar comando remoto (recargar visor)
   sendCommand: async (screenCode, action) => {
-    // Reutilizamos el endpoint o invocamos vía fetch/SignalR
-    // En este caso lo conectamos vía Hub o endpoint ligero
-  }
+    const res = await fetch(`${BASE_URL}/Screens/${screenCode}/command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action })
+    });
+    return await res.json();
+    }
   
 };

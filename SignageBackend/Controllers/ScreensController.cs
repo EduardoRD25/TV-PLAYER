@@ -111,4 +111,16 @@ public class ScreensController : ControllerBase
 
         return Ok(screens);
     }
+
+    [HttpPost("{code}/command")]
+    public async Task<IActionResult> SendCommand(string code, [FromBody] CommandRequest req, [FromServices] IHubContext<SignageHub> hubContext)
+    {
+        await hubContext.Clients.Group(code).SendAsync("ReceiveCommand", req.Action);
+        return Ok(new { message = $"Comando {req.Action} enviado a {code}" });
+    }
+
+    public class CommandRequest
+    {
+        public string Action { get; set; } = string.Empty;
+    }
 }

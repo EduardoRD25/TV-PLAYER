@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { api } from "./api";
 import "./App.css";
-import { Tv, Plus, Upload, Trash2, CheckCircle2, ChevronUp, X } from "lucide-react";
+import { Tv, Plus, Upload, Trash2, CheckCircle2, ChevronUp, X, RotateCw } from "lucide-react";
 
 function App() {
   const [screens, setScreens] = useState([]);
@@ -39,6 +39,16 @@ function App() {
       setSlides([]);
     }
   };
+
+  //Envio de comando/reload
+  const handleReloadScreen = async (e, screenCode) => {
+  e.stopPropagation();
+  try {
+    await api.sendCommand(screenCode, "reload");
+  } catch (err) {
+    console.error("Error enviando comando:", err);
+  }
+};
 
   // Emparejar nueva pantalla
   const handlePair = async (e) => {
@@ -167,6 +177,15 @@ function App() {
                         onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
                       >
                         <Trash2 size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => handleReloadScreen(e, code)}
+                        title="Reiniciar visor en la TV"
+                        style={{ background: "transparent", color: "#64748b", padding: "2px", cursor: "pointer" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "#38bdf8")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "#64748b")}
+                      >
+                        <RotateCw size={15} />
                       </button>
                     </div>
                   </div>

@@ -53,6 +53,11 @@ if (!Directory.Exists(uploadsDirectory))
 var contentTypeProvider = new FileExtensionContentTypeProvider();
 contentTypeProvider.Mappings[".mp4"] = "video/mp4";
 contentTypeProvider.Mappings[".webm"] = "video/webm";
+// Asegurar extensiones de imagen estándar
+contentTypeProvider.Mappings[".jpg"] = "image/jpeg";
+contentTypeProvider.Mappings[".jpeg"] = "image/jpeg";
+contentTypeProvider.Mappings[".png"] = "image/png";
+contentTypeProvider.Mappings[".webp"] = "image/webp";
 
 app.UseStaticFiles(new StaticFileOptions
 {
