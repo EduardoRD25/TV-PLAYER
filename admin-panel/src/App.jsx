@@ -72,6 +72,17 @@ function App() {
     }
   };
 
+  // Cambiar la duración de una diapositiva individual
+  const handleDurationChange = (index, newSeconds) => {
+    const parsedSeconds = Math.max(1, parseInt(newSeconds) || 1); // Mínimo 1 segundo
+    const updatedSlides = [...slides];
+    updatedSlides[index] = {
+      ...updatedSlides[index],
+      duration: parsedSeconds * 1000 // Convertir a milisegundos para el backend y TV
+    };
+    setSlides(updatedSlides);
+  };
+
   // Eliminar slide
   const handleRemoveSlide = (index) => {
     setSlides(slides.filter((_, i) => i !== index));
@@ -179,10 +190,20 @@ function App() {
                 <div key={index} className="slide-item">
                   <img src={slide.url} alt={`Slide ${index + 1}`} />
                   <div className="slide-info">
-                    <p>Duración: {slide.duration / 1000}s</p>
+                    <div className="duration-control">
+                      <label>Segundos:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="300"
+                        value={Math.round((slide.duration || 5000) / 1000)}
+                        onChange={(e) => handleDurationChange(index, e.target.value)}
+                        className="duration-input"
+                      />
+                    </div>
                     <button
                       onClick={() => handleRemoveSlide(index)}
-                      style={{ background: "#ef4444", color: "white", padding: "4px 8px", marginTop: "6px", width: "100%", borderRadius: "4px" }}
+                      className="btn-delete"
                     >
                       <Trash2 size={14} style={{ verticalAlign: "middle" }} /> Eliminar
                     </button>

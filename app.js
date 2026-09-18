@@ -1,4 +1,7 @@
-const API_BASE_URL = "http://192.168.1.10:5000";
+// Detectar automáticamente si corre en la laptop o en la TV Box
+const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+  ? "http://localhost:5000"
+  : "http://192.168.1.10:5000";
 
 // Elementos del DOM
 const pairingScreen = document.getElementById("pairing-screen");
@@ -33,19 +36,34 @@ function checkPairingState() {
   }
 }
 
-// 3. Lógica del Carrusel con Pre-carga Suave
+// 3. Control estricto de temporizadores
+function clearCurrentTimer() {
+  if (slideTimer) {
+    clearTimeout(slideTimer);
+    slideTimer = null;
+  }
+}
+
+// 4. Lógica del Carrusel con Pre-carga Suave
 function startPlayer() {
-  if (slideTimer) clearTimeout(slideTimer);
+  clearCurrentTimer();
   if (!playlist || playlist.length === 0) return;
+
+  if (currentIndex >= playlist.length) {
+    currentIndex = 0;
+  }
 
   const currentItem = playlist[currentIndex];
   activeSlideElement.src = currentItem.url;
   activeSlideElement.classList.add("active");
 
-  scheduleNextSlide(currentItem.duration || 5000);
+  const duration = currentItem.duration || 5000;
+  scheduleNextSlide(duration);
 }
 
 function scheduleNextSlide(duration) {
+  clearCurrentTimer();
+
   slideTimer = setTimeout(() => {
     currentIndex = (currentIndex + 1) % playlist.length;
     const nextItem = playlist[currentIndex];
@@ -59,17 +77,22 @@ function scheduleNextSlide(duration) {
       incomingElement.classList.add("active");
       outgoingElement.classList.remove("active");
       activeSlideElement = incomingElement;
-      scheduleNextSlide(nextItem.duration || 5000);
+
+      // Programar la duración específica del nuevo slide
+      const nextDuration = nextItem.duration || 5000;
+      scheduleNextSlide(nextDuration);
     };
+
     imgLoader.onerror = () => {
       console.warn("Error cargando imagen:", nextItem.url);
-      scheduleNextSlide(2000);
+      scheduleNextSlide(3000);
     };
+
     imgLoader.src = nextItem.url;
   }, duration);
 }
 
-// 4. Conexión SignalR (.NET)
+// 5. Conexión SignalR (.NET)
 const connection = new signalR.HubConnectionBuilder()
   .withUrl(`${API_BASE_URL}/signageHub`)
   .withAutomaticReconnect([0, 2000, 5000, 10000])
@@ -85,11 +108,29 @@ connection.on("ScreenPaired", (data) => {
 
 connection.on("UpdatePlaylist", (newPlaylist) => {
   console.log("Nueva lista recibida en tiempo real:", newPlaylist);
+  clearCurrentTimer();
   playlist = newPlaylist;
   localStorage.setItem("saved_playlist", JSON.stringify(newPlaylist));
   currentIndex = 0;
   startPlayer();
 });
+
+// Variable para el temporizador de heartbeat
+let heartbeatTimer = null;
+
+function startHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+
+  heartbeatTimer = setInterval(async () => {
+    if (connection && connection.state === signalR.HubConnectionState.Connected) {
+      try {
+        await connection.invoke("SendHeartbeat", SCREEN_CODE);
+      } catch (err) {
+        console.warn("Fallo al enviar heartbeat:", err);
+      }
+    }
+  }, 25000); // Cada 25 segundos
+}
 
 async function connectSignalR() {
   try {
@@ -98,11 +139,8 @@ async function connectSignalR() {
     statusText.className = "online";
 
     await connection.invoke("JoinScreen", SCREEN_CODE);
-
-    // Iniciar el envío periódico de latidos
     startHeartbeat();
 
-    // Registrar en BD si está pendiente
     await fetch(`${API_BASE_URL}/api/Screens/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -111,11 +149,12 @@ async function connectSignalR() {
   } catch (err) {
     statusText.textContent = "Offline (Local)";
     statusText.className = "offline";
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
     setTimeout(connectSignalR, 5000);
   }
 }
 
-// 5. Cargar lista guardada en SQLite
+// 6. Cargar lista guardada en SQLite
 async function fetchPlaylistFromBackend() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/Playlist/${SCREEN_CODE}`);
@@ -139,23 +178,6 @@ async function fetchPlaylistFromBackend() {
     currentIndex = 0;
     startPlayer();
   }
-}
-
-// Variable para el temporizador de heartbeat
-let heartbeatTimer = null;
-
-function startHeartbeat() {
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-
-  heartbeatTimer = setInterval(async () => {
-    if (connection && connection.state === signalR.HubConnectionState.Connected) {
-      try {
-        await connection.invoke("SendHeartbeat", SCREEN_CODE);
-      } catch (err) {
-        console.warn("Fallo al enviar heartbeat:", err);
-      }
-    }
-  }, 25000); // Cada 25 segundos
 }
 
 // Inicialización
