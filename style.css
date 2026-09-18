@@ -113,3 +113,19 @@ body, html {
 .hidden {
   display: none !important;
 }
+
+img.slide, video.slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.8s ease-in-out;
+  pointer-events: none;
+}
+
+img.slide.active, video.slide.active {
+  opacity: 1;
+}

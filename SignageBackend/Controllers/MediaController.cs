@@ -1,6 +1,3 @@
-//Este controlador valida que el archivo sea una imagen (.jpg, .png, .jpeg, .webp), 
-// genera un nombre de archivo único usando un Guid (para evitar colisiones de nombres) 
-// y devuelve la URL completa con la IP o dominio del servidor.
 using System;
 using System.IO;
 using System.Linq;
@@ -8,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using SignageBackend.Models;
 
 namespace SignageBackend.Controllers;
 
@@ -17,7 +13,10 @@ namespace SignageBackend.Controllers;
 public class MediaController : ControllerBase
 {
     private readonly IWebHostEnvironment _env;
-    private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
+
+    // Extensiones permitidas (imágenes y videos)
+    private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp", ".mp4", ".webm" };
+    private const long MaxFileSizeInBytes = 60 * 1024 * 1024; // 60 MB
 
     public MediaController(IWebHostEnvironment env)
     {
@@ -25,46 +24,44 @@ public class MediaController : ControllerBase
     }
 
     [HttpPost("upload")]
-    public async Task<IActionResult> UploadImage([FromForm] FileUploadDto request)
+    public async Task<IActionResult> Upload([FromForm] IFormFile file)
     {
-        var file = request.File;
-
         if (file == null || file.Length == 0)
-        {
-            return BadRequest(new { message = "No se ha proporcionado ningún archivo." });
-        }
+            return BadRequest(new { message = "Archivo no proporcionado." });
 
-        // 1. Validar extensión
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!_allowedExtensions.Contains(extension))
-        {
-            return BadRequest(new { message = "Formato no permitido. Solo se aceptan .jpg, .jpeg, .png y .webp." });
-        }
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
 
-        // 2. Limitar tamaño a 15 MB
-        if (file.Length > 15 * 1024 * 1024)
-        {
-            return BadRequest(new { message = "El archivo excede el tamaño máximo de 15 MB." });
-        }
+        if (!AllowedExtensions.Contains(ext))
+            return BadRequest(new { message = "Formato no permitido. Usa JPG, PNG, WEBP, MP4 o WEBM." });
 
-        // 3. Generar nombre único
-        var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-        var uploadPath = Path.Combine(_env.ContentRootPath, "uploads", uniqueFileName);
+        // Límite de tamaño: 60 MB
+        if (file.Length > MaxFileSizeInBytes)
+            return BadRequest(new { message = "El archivo supera el límite de 60 MB." });
 
-        // 4. Guardar archivo en disco
-        using (var stream = new FileStream(uploadPath, FileMode.Create))
+        // Resolución segura de la ruta wwwroot/uploads usando IWebHostEnvironment
+        var webRoot = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        var uploadsFolder = Path.Combine(webRoot, "uploads");
+
+        if (!Directory.Exists(uploadsFolder))
+            Directory.CreateDirectory(uploadsFolder);
+
+        var uniqueFileName = $"{Guid.NewGuid()}{ext}";
+        var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
         {
             await file.CopyToAsync(stream);
         }
 
-        // 5. URL accesible
-        var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uniqueFileName}";
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var publicUrl = $"{baseUrl}/uploads/{uniqueFileName}";
 
         return Ok(new
         {
             fileName = uniqueFileName,
-            url = fileUrl,
-            size = file.Length
+            url = publicUrl,
+            size = file.Length,
+            isVideo = ext == ".mp4" || ext == ".webm"
         });
     }
 }

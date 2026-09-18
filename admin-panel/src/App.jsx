@@ -201,8 +201,13 @@ function App() {
             </div>
             <div style={{ display: "flex", gap: "10px" }}>
               <label className="btn-primary" style={{ cursor: "pointer" }}>
-                <Upload size={18} /> {uploading ? "Subiendo..." : "Subir Foto"}
-                <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: "none" }} />
+                <Upload size={18} /> {uploading ? "Subiendo..." : "Subir Medio"}
+                <input 
+                  type="file" 
+                  accept="image/*,video/mp4,video/webm" 
+                  onChange={handleFileUpload} 
+                  style={{ display: "none" }} 
+                />
               </label>
               <button className="btn-success" onClick={handlePublish}>
                 <CheckCircle2 size={18} style={{ verticalAlign: "middle", marginRight: "6px" }} />
@@ -223,30 +228,38 @@ function App() {
             </p>
           ) : (
             <div className="slides-preview">
-              {slides.map((slide, index) => (
-                <div key={index} className="slide-item">
-                  <img src={slide.url} alt={`Slide ${index + 1}`} />
-                  <div className="slide-info">
-                    <div className="duration-control">
-                      <label>Segundos:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="300"
-                        value={Math.round((slide.duration || 5000) / 1000)}
-                        onChange={(e) => handleDurationChange(index, e.target.value)}
-                        className="duration-input"
-                      />
+              {slides.map((slide, index) => {
+                const isVid = slide.url.endsWith(".mp4") || slide.url.endsWith(".webm");
+                return (
+                  <div key={index} className="slide-item">
+                    {isVid ? (
+                      <video src={slide.url} muted style={{ width: "100%", height: "110px", objectFit: "cover" }} />
+                    ) : (
+                      <img src={slide.url} alt={`Slide ${index + 1}`} />
+                    )}
+                    <div className="slide-info">
+                      <div className="duration-control">
+                        <label>{isVid ? "Video:" : "Segundos:"}</label>
+                        {isVid ? (
+                          <span style={{ fontSize: "0.75rem", color: "#38bdf8", fontWeight: "bold" }}>Auto (fin de video)</span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="1"
+                            max="300"
+                            value={Math.round((slide.duration || 5000) / 1000)}
+                            onChange={(e) => handleDurationChange(index, e.target.value)}
+                            className="duration-input"
+                          />
+                        )}
+                      </div>
+                      <button onClick={() => handleRemoveSlide(index)} className="btn-delete">
+                        <Trash2 size={14} style={{ verticalAlign: "middle" }} /> Eliminar
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleRemoveSlide(index)}
-                      className="btn-delete"
-                    >
-                      <Trash2 size={14} style={{ verticalAlign: "middle" }} /> Eliminar
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

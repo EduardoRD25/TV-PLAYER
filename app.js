@@ -7,14 +7,18 @@ const API_BASE_URL = window.location.hostname === "localhost" || window.location
 const pairingScreen = document.getElementById("pairing-screen");
 const pairingCodeDisplay = document.getElementById("pairing-code-display");
 const statusText = document.getElementById("status-text");
-const slideA = document.getElementById("slide-a");
-const slideB = document.getElementById("slide-b");
+
+// Referencias a los elementos multimedia (Capas A y B)
+const imgA = document.getElementById("slide-img-a");
+const vidA = document.getElementById("slide-vid-a");
+const imgB = document.getElementById("slide-img-b");
+const vidB = document.getElementById("slide-vid-b");
 
 // Estado del reproductor
 let playlist = [];
 let currentIndex = 0;
 let slideTimer = null;
-let activeSlideElement = slideA;
+let currentLayer = "A";
 
 // 1. Obtener o generar código único de pantalla
 let SCREEN_CODE = localStorage.getItem("screen_code");
@@ -36,7 +40,12 @@ function checkPairingState() {
   }
 }
 
-// 3. Control estricto de temporizadores
+// 3. Utilidades multimedia y temporizadores
+function isVideoUrl(url) {
+  if (!url) return false;
+  return url.endsWith(".mp4") || url.endsWith(".webm");
+}
+
 function clearCurrentTimer() {
   if (slideTimer) {
     clearTimeout(slideTimer);
@@ -44,52 +53,115 @@ function clearCurrentTimer() {
   }
 }
 
-// 4. Lógica del Carrusel con Pre-carga Suave
-function startPlayer() {
+function stopAllVideos() {
+  [vidA, vidB].forEach((v) => {
+    if (v) {
+      v.pause();
+      v.currentTime = 0;
+      v.onended = null;
+      v.removeAttribute("src");
+      v.load();
+    }
+  });
+}
+
+function clearAllMedia() {
   clearCurrentTimer();
-  if (!playlist || playlist.length === 0) return;
+  stopAllVideos();
+  [imgA, imgB, vidA, vidB].forEach((el) => {
+    if (el) {
+      el.classList.remove("active");
+      if (el.tagName === "IMG") el.src = "";
+    }
+  });
+}
 
-  if (currentIndex >= playlist.length) {
-    currentIndex = 0;
+// 4. Lógica de renderizado y transiciones (Capas A/B)
+function renderItem(layer, item, onReady) {
+  const isVid = isVideoUrl(item.url);
+  const imgElem = layer === "A" ? imgA : imgB;
+  const vidElem = layer === "A" ? vidA : vidB;
+
+  if (isVid) {
+    imgElem.classList.remove("active");
+    vidElem.src = item.url;
+    vidElem.load();
+
+    vidElem.oncanplay = () => {
+      vidElem.oncanplay = null;
+      onReady(vidElem);
+    };
+    vidElem.onerror = () => {
+      console.warn("Error cargando video:", item.url);
+      scheduleNextSlide(3000);
+    };
+  } else {
+    vidElem.classList.remove("active");
+    const loader = new Image();
+    loader.onload = () => {
+      imgElem.src = item.url;
+      onReady(imgElem);
+    };
+    loader.onerror = () => {
+      console.warn("Error cargando imagen:", item.url);
+      scheduleNextSlide(3000);
+    };
+    loader.src = item.url;
   }
-
-  const currentItem = playlist[currentIndex];
-  activeSlideElement.src = currentItem.url;
-  activeSlideElement.classList.add("active");
-
-  const duration = currentItem.duration || 5000;
-  scheduleNextSlide(duration);
 }
 
 function scheduleNextSlide(duration) {
   clearCurrentTimer();
-
   slideTimer = setTimeout(() => {
-    currentIndex = (currentIndex + 1) % playlist.length;
-    const nextItem = playlist[currentIndex];
-
-    const incomingElement = activeSlideElement === slideA ? slideB : slideA;
-    const outgoingElement = activeSlideElement;
-
-    const imgLoader = new Image();
-    imgLoader.onload = () => {
-      incomingElement.src = nextItem.url;
-      incomingElement.classList.add("active");
-      outgoingElement.classList.remove("active");
-      activeSlideElement = incomingElement;
-
-      // Programar la duración específica del nuevo slide
-      const nextDuration = nextItem.duration || 5000;
-      scheduleNextSlide(nextDuration);
-    };
-
-    imgLoader.onerror = () => {
-      console.warn("Error cargando imagen:", nextItem.url);
-      scheduleNextSlide(3000);
-    };
-
-    imgLoader.src = nextItem.url;
+    advanceSlide();
   }, duration);
+}
+
+function startPlayer() {
+  clearCurrentTimer();
+  stopAllVideos();
+  if (!playlist || playlist.length === 0) return;
+
+  if (currentIndex >= playlist.length) currentIndex = 0;
+  const currentItem = playlist[currentIndex];
+
+  renderItem(currentLayer, currentItem, (activeElem) => {
+    activeElem.classList.add("active");
+
+    if (isVideoUrl(currentItem.url)) {
+      activeElem.play().catch((e) => console.warn("Autoplay bloqueado:", e));
+      activeElem.onended = () => advanceSlide();
+    } else {
+      scheduleNextSlide(currentItem.duration || 5000);
+    }
+  });
+}
+
+function advanceSlide() {
+  clearCurrentTimer();
+  currentIndex = (currentIndex + 1) % playlist.length;
+  const nextItem = playlist[currentIndex];
+  const nextLayer = currentLayer === "A" ? "B" : "A";
+
+  renderItem(nextLayer, nextItem, (incomingElem) => {
+    // Apagar la capa saliente
+    const outgoingImg = currentLayer === "A" ? imgA : imgB;
+    const outgoingVid = currentLayer === "A" ? vidA : vidB;
+    outgoingImg.classList.remove("active");
+    outgoingVid.classList.remove("active");
+    outgoingVid.pause();
+
+    // Activar capa entrante
+    incomingElem.classList.add("active");
+    currentLayer = nextLayer;
+
+    if (isVideoUrl(nextItem.url)) {
+      incomingElem.play().catch((e) => console.warn("Autoplay bloqueado:", e));
+      incomingElem.onended = () => advanceSlide();
+    } else {
+      scheduleNextSlide(nextItem.duration || 5000);
+    }
+  });
 }
 
 // 5. Conexión SignalR (.NET)
@@ -122,13 +194,10 @@ connection.on("ReceiveCommand", (action) => {
   } else if (action === "clear") {
     localStorage.removeItem("saved_playlist");
     playlist = [];
-    clearCurrentTimer();
-    activeSlideElement.src = "";
-    activeSlideElement.classList.remove("active");
+    clearAllMedia();
   }
 });
 
-// Variable para el temporizador de heartbeat
 let heartbeatTimer = null;
 
 function startHeartbeat() {
@@ -142,7 +211,7 @@ function startHeartbeat() {
         console.warn("Fallo al enviar heartbeat:", err);
       }
     }
-  }, 25000); // Cada 25 segundos
+  }, 25000);
 }
 
 async function connectSignalR() {
@@ -167,7 +236,7 @@ async function connectSignalR() {
   }
 }
 
-// 6. Cargar lista guardada en SQLite
+// 6. Cargar lista guardada en backend o local
 async function fetchPlaylistFromBackend() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/Playlist/${SCREEN_CODE}`);

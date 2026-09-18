@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using SignageBackend.Data;
 using SignageBackend.Hubs;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,11 +49,14 @@ if (!Directory.Exists(uploadsDirectory))
     Directory.CreateDirectory(uploadsDirectory);
 }
 
-// 5. Exponer la carpeta 'uploads' como archivos estáticos públicos
+// Configurar tipos MIME para videos e imágenes
+var contentTypeProvider = new FileExtensionContentTypeProvider();
+contentTypeProvider.Mappings[".mp4"] = "video/mp4";
+contentTypeProvider.Mappings[".webm"] = "video/webm";
+
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(uploadsDirectory),
-    RequestPath = "/uploads"
+    ContentTypeProvider = contentTypeProvider
 });
 
 if (app.Environment.IsDevelopment())

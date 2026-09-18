@@ -19,9 +19,14 @@
   </div>
 
   <!-- Contenedor del reproductor de diapositivas -->
-  <div id="player-container">
-    <img id="slide-a" class="slide active" src="" alt="Slide A" />
-    <img id="slide-b" class="slide" src="" alt="Slide B" />
+  <div id="slideshow-container">
+    <!-- Capa A -->
+    <img id="slide-img-a" class="slide" />
+    <video id="slide-vid-a" class="slide" muted playsinline></video>
+
+    <!-- Capa B (crossfade) -->
+    <img id="slide-img-b" class="slide" />
+    <video id="slide-vid-b" class="slide" muted playsinline></video>
   </div>
 
   <div id="status-indicator">
