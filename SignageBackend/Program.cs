@@ -20,21 +20,19 @@ builder.Services.AddSwaggerGen();
 // Permitir CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp", policy =>
+    options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins(
-                  "http://localhost:5173", // Vite default
-                  "http://localhost:3000", // CRA default
-                  "http://127.0.0.1:5173"
-              )
+        policy.SetIsOriginAllowed(_ => true) // Cubre localhost, 127.0.0.1 y cualquier IP de la red local
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials(); // Obligatorio para SignalR con WebSockets
+              .AllowCredentials();
     });
 });
 
 var app = builder.Build();
-app.UseCors("AllowReactApp");
+//app.UseCors("AllowReactApp");
+app.UseCors("AllowAll");
+
 
 // 3. Crear base de datos automáticamente
 using (var scope = app.Services.CreateScope())
@@ -63,7 +61,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowAll");
+app.UseCors(policy => policy
+    .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+    .AllowCredentials());
 app.UseAuthorization();
 
 app.MapControllers();
